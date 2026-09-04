@@ -34,3 +34,46 @@ cd /
 cd database/files/source
 cat nohup.out
 ```
+
+## Dump
+```bash
+pg_dump \
+    --dbname="host=cirrus.ita.chalmers.se port=5432 dbname=se_mobile_data user=mobiledata gssencmode=disable sslmode=require" \
+    -Fc \
+    --no-owner \
+    --no-privileges \
+    -t boundaries.swe_national_parks_bbox\
+    -f swe_national_parks_bbox.dump
+```
+
+## Restore
+```bash
+pg_restore \
+    --dbname="host=cirrus.ita.chalmers.se port=5432 dbname=ual_prototyping user=ual gssencmode=disable sslmode=require" \
+    --no-owner \
+    --no-privileges \
+    -W \
+    swe_national_parks_bbox.dump
+```
+
+top -u "$monaliza"
+
+
+pg_dump \
+    --dbname="host=cirrus.ita.chalmers.se port=5432 dbname=se_mobile_data user=mobiledata gssencmode=disable sslmode=require" \
+    -Fc \
+    --no-owner \
+    --no-privileges \
+    -t extracts.srh_proto_tourism_howde_2024_city \
+    -t extracts.srh_proto_tourism_infostops_stops_2024_city \
+    -t extracts.srh_proto_tourism_infostops_stops_2024_city_10min \
+    -t extracts.srh_proto_tourism_mpd_2024_city \
+    -t extracts.srh_proto_tourism_mpd_2024_july \
+    -f srh_mpd_data.dump
+
+pg_restore \
+    --dbname="host=cirrus.ita.chalmers.se port=5432 dbname=ual_prototyping user=ual gssencmode=disable sslmode=require" \
+    --no-owner \
+    --no-privileges \
+    -W \
+    srh_mpd_data.dump

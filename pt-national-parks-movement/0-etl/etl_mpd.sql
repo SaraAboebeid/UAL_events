@@ -11,10 +11,10 @@
 -- Importantly, these additional attributes are not essential (especially is_grid) or can be calculated for local samples later.
 -- Probably can even be made faster with some clever tricks...
 
-CREATE INDEX swe_national_parks_movement_data_2025_aid_idx ON raw_data.swe_national_parks_movement_data_2025 (device_aid) INCLUDE (timestamp);
+CREATE INDEX swe_national_parks_movement_data_2023_aid_idx ON raw_data.swe_national_parks_movement_data_2023 (device_aid) INCLUDE (timestamp);
 
-DROP TABLE IF EXISTS processed.swe_national_parks_movement_point_types_2025 CASCADE;
-CREATE TABLE processed.swe_national_parks_movement_point_types_2025
+DROP TABLE IF EXISTS processed.swe_national_parks_movement_point_types_2023 CASCADE;
+CREATE TABLE processed.swe_national_parks_movement_point_types_2023
 (
     sid          BIGSERIAL PRIMARY KEY,
     geom         GEOMETRY('Point', 4326),
@@ -41,7 +41,7 @@ CREATE TABLE processed.swe_national_parks_movement_point_types_2025
 
 WITH data_with_geom AS(
         SELECT geom, device_aid::uuid AS device_aid, to_timestamp (timestamp) AT TIME ZONE 'CET' as timestamp, horizontal_accuracy, location_method
-        FROM  raw_data.swe_national_parks_movement_data_2025
+        FROM  raw_data.swe_national_parks_movement_data_2023
     ),
      points_sequence AS (
         SELECT geom, device_aid, timestamp, ST_X(geom) AS x, ST_Y(geom) AS y,
@@ -62,7 +62,7 @@ WITH data_with_geom AS(
             (out_distance/1000.0)/NULLIF((out_duration/3600.0),0) AS out_speed
          FROM points_sequence
 )
-INSERT INTO processed.swe_national_parks_movement_point_types_2025(geom, device_aid, timestamp, x, y, accuracy, method,
+INSERT INTO processed.swe_national_parks_movement_point_types_2023(geom, device_aid, timestamp, x, y, accuracy, method,
             in_duration, in_distance, in_bearing, out_duration, out_distance, out_bearing, series, in_speed, out_speed, type)
     SELECT geom, device_aid, timestamp, x, y, accuracy, method, in_duration, in_distance, in_bearing,
            out_duration, out_distance, out_bearing, series, in_speed, out_speed,
@@ -83,16 +83,16 @@ INSERT INTO processed.swe_national_parks_movement_point_types_2025(geom, device_
 ;
 
 -- This update is quite fast
-UPDATE processed.swe_national_parks_movement_point_types_2025 SET
+UPDATE processed.swe_national_parks_movement_point_types_2023 SET
     is_last = TRUE
     WHERE out_speed IS NULL
 ;
 
-UPDATE processed.swe_national_parks_movement_point_types_2025 SET
+UPDATE processed.swe_national_parks_movement_point_types_2023 SET
     is_stationary = TRUE
     WHERE device_aid IN (SELECT device_aid FROM (
             SELECT device_aid, count(DISTINCT geom) count
-            FROM processed.swe_national_parks_movement_point_types_2025
+            FROM processed.swe_national_parks_movement_point_types_2023
             GROUP BY device_aid) AS a
             WHERE a.count = 1
         )
@@ -112,8 +112,8 @@ UPDATE processed.point_types_2024 SET
 */
 
 -- add spatial index to geometries
-CREATE INDEX swe_national_parks_movement_point_types_2025_uid_idx ON processed.swe_national_parks_movement_point_types_2025(device_aid);
-CREATE INDEX swe_national_parks_movement_point_types_2025_geom_sidx ON processed.swe_national_parks_movement_point_types_2025 USING GIST (geom);
+CREATE INDEX swe_national_parks_movement_point_types_2023_uid_idx ON processed.swe_national_parks_movement_point_types_2023(device_aid);
+CREATE INDEX swe_national_parks_movement_point_types_2023_geom_sidx ON processed.swe_national_parks_movement_point_types_2023 USING GIST (geom);
 
 
 -- Jorge Gil, 2025
