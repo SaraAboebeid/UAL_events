@@ -9,9 +9,7 @@ import streamlit as st
 from streamlit_folium import st_folium
 
 
-# ================================================================
 # CONFIG
-# ================================================================
 
 YELLOW = "#FFD400"
 DARK = "#0B0D10"
@@ -25,21 +23,39 @@ ESRI = (
 )
 
 MONTHS = list(calendar.month_abbr)[1:]
+WEEKDAYS = list(calendar.day_name)
 
+# Broad categories set in 1-etl_data.ipynb, in color-slot order
 CATEGORY_ORDER = [
     "Concert",
+    "Theatre & shows",
     "Sports",
-    "Theatre",
     "Festival",
     "Exhibition",
     "Market",
+    "Family",
+    "Tours",
+    "Food & drink",
+    "Other",
 ]
 
+# Colorblind-checked palette for the dark background (max 8 hues);
+# the two smallest groups share a neutral grey
+CATEGORY_COLORS = {
+    "Concert": "#3987e5",
+    "Theatre & shows": "#d95926",
+    "Sports": "#199e70",
+    "Festival": "#c98500",
+    "Exhibition": "#d55181",
+    "Market": "#008300",
+    "Family": "#9085e9",
+    "Tours": "#e66767",
+    "Food & drink": "#898781",
+    "Other": "#898781",
+}
 
-# ================================================================
+
 # PAGE CONFIG
-# ================================================================
-
 st.set_page_config(
     page_title="Gothenburg Events",
     page_icon="🎟️",
@@ -48,10 +64,7 @@ st.set_page_config(
 )
 
 
-# ================================================================
 # CUSTOM CSS
-# ================================================================
-
 st.markdown(
     f"""
     <style>
@@ -116,16 +129,14 @@ st.markdown(
 )
 
 
-# ================================================================
-# LOAD DATA
-# ================================================================
+# LOAD DATA (events.csv is written by 1-etl_data.ipynb)
 
 HERE = Path(__file__).resolve().parent
 
 DATA = next(
     (
         p / "events.csv"
-        for p in [HERE, *HERE.parents]
+        for p in [HERE, HERE / "got-events-data", *HERE.parents]
         if (p / "events.csv").exists()
     ),
     None,
@@ -133,43 +144,67 @@ DATA = next(
 
 if DATA is None:
     st.error(
-        "events.csv not found. Run the data cell first, "
+        "events.csv not found. Run 1-etl_data.ipynb first, "
         f"so the file is saved in {HERE} or a folder above it."
     )
     st.stop()
 
-df = pd.read_csv(
-    DATA,
-    parse_dates=["start"],
+
+@st.cache_data
+def load(path, modified):
+    data = pd.read_csv(path, parse_dates=["start", "end"])
+    data["free"] = data["free"].fillna(False).astype(bool)
+    return data
+
+
+df = load(DATA, DATA.stat().st_mtime)
+
+st.sidebar.caption(
+    "Data: Göteborg & Co events API · "
+    f"fetched {pd.Timestamp(DATA.stat().st_mtime, unit='s'):%d %b %Y %H:%M}"
 )
 
 
-# ================================================================
 # HEADER
-# ================================================================
 
 st.title("Gothenburg Events")
 
 st.markdown(
     """
     <div class="subtitle">
-        Event activity, attendance and venue analysis across Gothenburg
+        Upcoming event activity, categories and venues across Gothenburg
     </div>
     """,
     unsafe_allow_html=True,
 )
 
 
-# ================================================================
 # SIDEBAR FILTERS
-# ================================================================
 
 st.sidebar.markdown("## Filters")
 
+# Past editions of yearly events are estimated in 1-etl_data.ipynb
+show_estimated = st.sidebar.toggle(
+    "Include estimated past editions",
+    value=True,
+    help=(
+        "The API only keeps the next edition of yearly events (e.g. Way Out "
+        "West 2027). Earlier editions are estimated by repeating the same "
+        "dates each year since the listing was created."
+    ),
+)
+
+if not show_estimated:
+    df = df[df["source"] == "API"]
+
 # Year
+years = sorted(df["year"].unique())
+this_year = pd.Timestamp.today().year
+
 year = st.sidebar.selectbox(
     "Year",
-    sorted(df["year"].unique()),
+    years,
+    index=years.index(this_year) if this_year in years else len(years) - 1,
 )
 
 year_df = df[df["year"] == year].copy()
@@ -222,7 +257,7 @@ available_categories = [
 ]
 
 selected_categories = st.sidebar.multiselect(
-    "Event type",
+    "Event category",
     options=available_categories,
     default=available_categories,
 )
@@ -230,6 +265,11 @@ selected_categories = st.sidebar.multiselect(
 filtered = filtered[
     filtered["category"].isin(selected_categories)
 ]
+
+# Free events only (only some events are marked free in the API)
+free_only = st.sidebar.toggle("Free events only")
+if free_only:
+    filtered = filtered[filtered["free"]]
 
 # Venue
 venues = sorted(
@@ -249,23 +289,13 @@ if selected_venues:
     ]
 
 
-# ================================================================
 # KPI CARDS
-# ================================================================
 
-total_events = len(filtered)
-
-total_people = int(
-    filtered["expected_people"].sum()
-)
-
+total_events = filtered["event_id"].nunique()
+total_dates = len(filtered)
+estimated_dates = int((filtered["source"] != "API").sum())
 venue_count = filtered["venue"].nunique()
-
-avg_attendance = (
-    int(filtered["expected_people"].mean())
-    if not filtered.empty
-    else 0
-)
+free_events = filtered.loc[filtered["free"], "event_id"].nunique()
 
 
 def metric_card(label, value):
@@ -279,9 +309,9 @@ def metric_card(label, value):
 
 cards = [
     ("EVENTS", total_events),
-    ("EXPECTED ATTENDANCE", total_people),
+    ("EVENT DATES", total_dates),
     ("VENUES", venue_count),
-    ("AVG. ATTENDANCE / EVENT", avg_attendance),
+    ("FREE EVENTS", free_events),
 ]
 
 for column, (label, value) in zip(st.columns(4), cards):
@@ -291,12 +321,16 @@ for column, (label, value) in zip(st.columns(4), cards):
             unsafe_allow_html=True,
         )
 
+if estimated_dates:
+    st.caption(
+        f"{estimated_dates:,} of {total_dates:,} event dates are estimated "
+        "past editions of yearly events (see Source in the schedule)."
+    )
+
 st.markdown("")
 
 
-# ================================================================
 # MAP
-# ================================================================
 
 st.markdown(
     '<div class="section-title">Event activity by venue</div>',
@@ -340,7 +374,7 @@ folium.Rectangle(
     fill_opacity=0.45,
 ).add_to(m)
 
-# One dot per venue
+# One dot per venue, sized by number of event dates
 spots = (
     filtered
     .groupby(
@@ -348,8 +382,10 @@ spots = (
         as_index=False,
     )
     .agg(
-        events=("name", "count"),
-        people=("expected_people", "sum"),
+        events=("event_id", "nunique"),
+        dates=("event_id", "count"),
+        # Dot color = the venue's most common category
+        main_category=("category", lambda x: x.value_counts().index[0]),
     )
 )
 
@@ -367,24 +403,23 @@ category_summary = (
 
 if not spots.empty:
 
-    biggest = spots["people"].max()
+    biggest = spots["dates"].max()
 
-    for _, s in spots.iterrows():
+    # Small dots on top of big ones
+    for _, s in spots.sort_values("dates", ascending=False).iterrows():
 
         venue = s["venue"]
+        color = CATEGORY_COLORS.get(s["main_category"], MUTED)
 
-        size = (
-            5 + 35 * (s["people"] / biggest) ** 0.5
-            if biggest > 0
-            else 5
-        )
+        size = 5 + 25 * (s["dates"] / biggest) ** 0.5
 
         popup_html = f"""
         <div style="font-family:Arial; min-width:220px;">
             <h4 style="margin-bottom:8px;">{venue}</h4>
             <b>Events:</b> {int(s["events"]):,}<br>
-            <b>Expected attendance:</b> {int(s["people"]):,}<br>
-            <b>Event categories:</b><br>
+            <b>Event dates:</b> {int(s["dates"]):,}<br>
+            <b>Main category:</b> {s["main_category"]}<br>
+            <b>All categories:</b><br>
             {category_summary.get(venue, "—")}
         </div>
         """
@@ -392,22 +427,40 @@ if not spots.empty:
         folium.CircleMarker(
             location=[s["lat"], s["lon"]],
             radius=size,
-            color=YELLOW,
+            color=color,
             weight=1.5,
             opacity=1,
             fill=True,
-            fill_color=YELLOW,
-            fill_opacity=0.25,
+            fill_color=color,
+            fill_opacity=0.35,
             tooltip=(
                 f"<b>{venue}</b><br>"
+                f"{s['main_category']} · "
                 f"{int(s['events']):,} events · "
-                f"{int(s['people']):,} expected people"
+                f"{int(s['dates']):,} dates"
             ),
             popup=folium.Popup(
                 popup_html,
                 max_width=300,
             ),
         ).add_to(m)
+
+# Legend for the categories currently on the map
+legend = "".join(
+    f'<span style="margin-right:16px; white-space:nowrap;">'
+    f'<span style="display:inline-block; width:10px; height:10px; '
+    f'border-radius:50%; background:{CATEGORY_COLORS[c]}; '
+    f'margin-right:6px;"></span>{c}</span>'
+    for c in CATEGORY_ORDER
+    if c in set(spots["main_category"])
+)
+
+st.markdown(
+    f'<div style="color:{MUTED}; font-size:0.85rem; margin-bottom:8px;">'
+    f'Dot colour = venue\'s main category · size = number of event dates'
+    f'<br>{legend}</div>',
+    unsafe_allow_html=True,
+)
 
 st_folium(
     m,
@@ -417,9 +470,7 @@ st_folium(
 )
 
 
-# ================================================================
 # CHART STYLE
-# ================================================================
 
 def style(fig):
 
@@ -443,9 +494,7 @@ def style(fig):
     return fig
 
 
-# ================================================================
 # ANALYTICS
-# ================================================================
 
 st.markdown(
     '<div class="section-title">Event analytics</div>',
@@ -455,86 +504,93 @@ st.markdown(
 tab1, tab2, tab3 = st.tabs(
     [
         "Event volume",
-        "Attendance",
+        "Weekdays",
         "Event categories",
     ]
 )
 
-# TAB 1: events per month, fixed to the selected year
+# TAB 1: the whole upcoming calendar by month, stacked by category.
+# Ignores the year/month/day filters (it is the timeline itself) but
+# follows the category, free and venue filters.
 with tab1:
 
+    timeline = df[df["category"].isin(selected_categories)]
+    if selected_venues:
+        timeline = timeline[timeline["venue"].isin(selected_venues)]
+    if free_only:
+        timeline = timeline[timeline["free"]]
+
     per_month = (
-        year_df
-        .groupby("month")
+        timeline
+        .assign(month_start=timeline["start"].dt.to_period("M").dt.to_timestamp())
+        .groupby(["month_start", "category"])
         .size()
-        .reindex(
-            range(1, 13),
-            fill_value=0,
-        )
+        .reset_index(name="dates")
     )
 
-    fig = px.line(
-        x=MONTHS,
-        y=per_month.values,
-        markers=True,
-        title=f"Events per month · {year}",
+    fig = px.bar(
+        per_month,
+        x="month_start",
+        y="dates",
+        color="category",
+        category_orders={"category": CATEGORY_ORDER},
+        color_discrete_map=CATEGORY_COLORS,
+        title="Upcoming event dates per month, by category",
         labels={
-            "x": "Month",
-            "y": "Events",
+            "month_start": "Month",
+            "dates": "Event dates",
+            "category": "Category",
         },
-        color_discrete_sequence=[YELLOW],
     )
 
     fig.update_traces(
-        line=dict(width=3),
-        marker=dict(size=7),
+        marker_line_color=DARK,
+        marker_line_width=1,
+        hovertemplate="%{x|%b %Y}<br>%{fullData.name}: %{y}<extra></extra>",
+    )
+    fig.update_xaxes(dtick="M1", tickformat="%b\n%Y")
+    fig.update_layout(
+        bargap=0.25,
+        legend=dict(title=None, orientation="h", y=-0.25),
     )
 
     st.plotly_chart(
-        style(fig),
+        style(fig).update_layout(height=420),
         width="stretch",
     )
 
-# TAB 2: expected people per event, fixed to the selected year
+    st.caption(
+        "Before today the API only keeps events that are still listed "
+        "(mostly the start dates of ongoing seasons and series); finished "
+        "events are removed. Months far ahead look smaller because "
+        "organisers publish closer to the date, not because fewer events "
+        "happen."
+    )
+
+# TAB 2: event dates per weekday, follows the filters
 with tab2:
 
-    per_event = year_df.assign(
-        month_name=year_df["month"].map(
-            lambda n: calendar.month_abbr[n]
+    per_weekday = (
+        filtered
+        .groupby("weekday")
+        .size()
+        .reindex(
+            WEEKDAYS,
+            fill_value=0,
         )
+        .reset_index(name="dates")
     )
 
-    fig = px.strip(
-        per_event,
-        x="month_name",
-        y="expected_people",
-        hover_name="name",
-        hover_data=[
-            "category",
-            "venue",
-            "start",
-        ],
-        log_y=True,
-        category_orders={
-            "month_name": MONTHS
-        },
-        title=f"Expected attendance per event · {year}",
+    fig = px.bar(
+        per_weekday,
+        x="weekday",
+        y="dates",
+        title="Event dates by weekday",
         labels={
-            "month_name": "Month",
-            "expected_people": "Expected people",
+            "weekday": "Weekday",
+            "dates": "Event dates",
         },
         color_discrete_sequence=[YELLOW],
-    )
-
-    fig.update_traces(
-        marker=dict(
-            size=7,
-            opacity=0.55,
-            line=dict(
-                width=1,
-                color=YELLOW,
-            ),
-        )
     )
 
     st.plotly_chart(
@@ -547,10 +603,10 @@ with tab3:
 
     category_counts = (
         filtered
-        .groupby("category")
-        .size()
+        .groupby("category")["event_id"]
+        .nunique()
         .reindex(
-            CATEGORY_ORDER,
+            available_categories,
             fill_value=0,
         )
         .reset_index(name="events")
@@ -560,13 +616,15 @@ with tab3:
         category_counts,
         x="category",
         y="events",
-        title="Events by event type",
+        color="category",
+        color_discrete_map=CATEGORY_COLORS,
+        title="Events by category",
         labels={
-            "category": "Event type",
+            "category": "Category",
             "events": "Events",
         },
-        color_discrete_sequence=[YELLOW],
     )
+    fig.update_layout(showlegend=False)
 
     st.plotly_chart(
         style(fig),
@@ -574,9 +632,7 @@ with tab3:
     )
 
 
-# ================================================================
 # CATEGORY OVERVIEW
-# ================================================================
 
 st.markdown(
     '<div class="section-title">Category overview</div>',
@@ -587,14 +643,13 @@ category_summary_df = (
     filtered
     .groupby("category")
     .agg(
-        events=("event_id", "count"),
-        expected_people=("expected_people", "sum"),
-        avg_attendance=("expected_people", "mean"),
+        events=("event_id", "nunique"),
+        dates=("event_id", "count"),
         venues=("venue", "nunique"),
+        free_events=("free", "sum"),
     )
     .reindex(CATEGORY_ORDER)
     .dropna(how="all")
-    .round()
     .astype(int)
     .reset_index()
 )
@@ -604,18 +659,16 @@ st.dataframe(
     width="stretch",
     hide_index=True,
     column_config={
-        "category": "Event type",
+        "category": "Category",
         "events": "Events",
-        "expected_people": "Expected attendance",
-        "avg_attendance": "Avg. attendance",
+        "dates": "Event dates",
         "venues": "Venues",
+        "free_events": "Free event dates",
     },
 )
 
 
-# ================================================================
 # EVENT SCHEDULE
-# ================================================================
 
 st.markdown(
     '<div class="section-title">Event schedule</div>',
@@ -630,7 +683,9 @@ display_df = (
             "category",
             "event_type",
             "venue",
-            "expected_people",
+            "free",
+            "source",
+            "link",
         ]
     ]
     .sort_values("start")
@@ -642,17 +697,21 @@ display_df["start"] = (
     .dt.strftime("%d %b %Y · %H:%M")
 )
 
-display_df.columns = [
-    "Date & time",
-    "Event",
-    "Category",
-    "Type",
-    "Venue",
-    "Expected people",
-]
-
 st.dataframe(
     display_df,
     width="stretch",
     hide_index=True,
+    column_config={
+        "start": "Date & time",
+        "name": "Event",
+        "category": "Category",
+        "event_type": "Type",
+        "venue": "Venue",
+        "free": st.column_config.CheckboxColumn("Free"),
+        "source": "Source",
+        "link": st.column_config.LinkColumn(
+            "More info",
+            display_text="goteborg.com",
+        ),
+    },
 )

@@ -1,0 +1,128 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Gothenburg Events</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<header class="top">
+  <div>
+    <h1>Gothenburg Events</h1>
+    <p class="sub">Event activity by category, year and location · Göteborg &amp; Co events API</p>
+  </div>
+  <p class="fetched" id="fetched"></p>
+</header>
+
+<!-- FILTERS -->
+<section class="filters">
+  <div class="filter-group">
+    <span class="label">Year</span>
+    <div class="chips" id="year-chips"></div>
+  </div>
+  <div class="filter-group">
+    <span class="label">Category</span>
+    <div class="chips" id="cat-chips"></div>
+  </div>
+  <div class="filter-row">
+    <div class="filter-group">
+      <span class="label">Location</span>
+      <input id="venue-input" list="venue-list" placeholder="Search a venue…" autocomplete="off">
+      <datalist id="venue-list"></datalist>
+    </div>
+    <label class="toggle"><input type="checkbox" id="est-toggle" checked><span></span>Estimated past editions</label>
+    <label class="toggle"><input type="checkbox" id="free-toggle"><span></span>Free events only</label>
+    <button class="reset" id="reset">Reset filters</button>
+  </div>
+  <div class="active" id="active-filters"></div>
+</section>
+
+<!-- KPIs -->
+<section class="kpis" id="kpis"></section>
+
+<!-- MAP -->
+<section class="panel map-panel">
+  <div class="panel-head">
+    <h2>Event activity by location</h2>
+    <div class="seg" id="map-mode">
+      <button data-mode="venues" class="on">Venues</button>
+      <button data-mode="heat">Heat map</button>
+    </div>
+  </div>
+  <div id="map"></div>
+  <div class="map-legend" id="map-legend"></div>
+</section>
+
+<!-- CHARTS -->
+<section class="grid">
+  <div class="panel wide">
+    <div class="panel-head">
+      <h2 id="timeline-title">Event dates per month</h2>
+    </div>
+    <div class="chart-box"><canvas id="timeline"></canvas></div>
+  </div>
+
+  <div class="panel wide">
+    <div class="panel-head">
+      <h2>Heat map · event dates by year and month</h2>
+      <span class="hint">Click a cell to filter</span>
+    </div>
+    <div id="calendar" class="calendar"></div>
+    <div class="ramp" id="ramp"></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2>Events by category</h2>
+      <span class="hint">Click a bar to focus</span>
+    </div>
+    <div class="chart-box tall"><canvas id="categories"></canvas></div>
+  </div>
+
+  <div class="panel">
+    <div class="panel-head">
+      <h2>Top locations</h2>
+      <span class="hint">Click to filter</span>
+    </div>
+    <ol class="venues" id="top-venues"></ol>
+  </div>
+</section>
+
+<!-- SCHEDULE -->
+<section class="panel">
+  <div class="panel-head">
+    <h2>Event schedule</h2>
+    <input id="search" placeholder="Search events…" autocomplete="off">
+  </div>
+  <div class="table-wrap">
+    <table>
+      <thead>
+        <tr><th>Date</th><th>Event</th><th>Category</th><th>Type</th><th>Location</th><th>Free</th><th>Source</th><th></th></tr>
+      </thead>
+      <tbody id="schedule"></tbody>
+    </table>
+  </div>
+  <p class="note" id="table-note"></p>
+</section>
+
+<footer>
+  Before today the API only keeps events that are still listed; finished events are removed.
+  Estimated past editions repeat the dates of yearly events (e.g. Way Out West) back to the year
+  their listing was created. Categories are derived from each event's heading.
+</footer>
+
+<div class="loading" id="loading">Loading events…</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.heat/0.2.0/leaflet-heat.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
