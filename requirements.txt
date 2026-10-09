@@ -1,4 +1,5 @@
 affine==2.4.0
+altair==6.3.0
 annotated-types==0.7.0
 anyio==4.14.0
 appnope==0.1.4
@@ -51,6 +52,7 @@ h11==0.16.0
 h3==4.5.0
 holidays==0.100
 httpcore==1.0.9
+httptools==0.8.0
 httpx==0.28.1
 idna==3.18
 igraph==1.0.0
@@ -59,6 +61,7 @@ ipykernel==7.3.0
 ipython==9.14.1
 ipython_pygments_lexers==1.1.1
 isoduration==20.11.0
+itsdangerous==2.2.0
 jedi==0.20.0
 Jinja2==3.1.6
 joblib==1.5.3
@@ -116,6 +119,7 @@ plotly==6.9.0
 pqdm==0.2.0
 prometheus_client==0.25.0
 prompt_toolkit==3.0.52
+protobuf==7.36.2
 psutil==7.2.2
 psycopg==3.3.4
 psycopg-binary==3.3.4
@@ -126,6 +130,7 @@ pyarrow==24.0.0
 pycparser==3.0
 pydantic==2.13.4
 pydantic_core==2.46.4
+pydeck==0.9.3
 pyfiglet==1.0.4
 Pygments==2.20.0
 pyogrio==0.12.1
@@ -136,6 +141,7 @@ pystac-client==0.9.0
 python-dateutil==2.9.0.post0
 python-dotenv==1.2.2
 python-json-logger==4.1.0
+python-multipart==0.0.32
 pytz==2026.2
 PyYAML==6.0.3
 pyzmq==27.1.0
@@ -162,12 +168,16 @@ six==1.17.0
 soupsieve==2.8.4
 SQLAlchemy==2.0.51
 stack-data==0.6.3
+starlette==1.7.0
 statsmodels==0.14.6
+streamlit==1.64.0
+streamlit-folium==0.27.4
 tabulate==0.10.0
 terminado==0.18.1
 texttable==1.7.0
 threadpoolctl==3.6.0
 tinycss2==1.5.1
+toml==0.10.2
 toolz==1.1.0
 tornado==6.5.7
 tqdm==4.68.3
@@ -177,10 +187,12 @@ typing_extensions==4.15.0
 tzdata==2026.2
 uri-template==1.3.0
 urllib3==2.7.0
+uvicorn==0.54.0
 wcwidth==0.8.1
 webcolors==25.10.0
 webencodings==0.5.1
 websocket-client==1.9.0
+websockets==16.1.1
 WorldPopPy==0.4.1
 xarray==2026.4.0
 xyzservices==2026.3.0
