@@ -1,2 +1,11 @@
 .idea/
 .DS_Store
+
+# API keys: never commit
+.env
+*.env
+
+__pycache__/
+
+# Gothenburg events dashboard: local only (API keys, downloaded data)
+got-events-data/
